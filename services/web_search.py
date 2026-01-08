@@ -18,15 +18,23 @@ def search_location(query):
         print(f"  📥 Status: {response.status_code}")
         
         if response.status_code == 200:
-            # Extract text snippets from results
-            # Find result snippets
-            snippets = re.findall(r'class="result__snippet"[^>]*>([^<]+)', response.text)
+            # Extract text snippets from results (capture full content including HTML tags)
+            snippet_matches = re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', response.text, re.DOTALL)
             
-            if snippets:
-                result = " ".join(snippets[:3])
-                print(f"  ✅ Found {len(snippets)} results")
-                print(f"  📄 Snippet: {result[:150]}...")
-                return result
+            if snippet_matches:
+                # Clean HTML tags from each snippet
+                snippets = []
+                for i, snippet in enumerate(snippet_matches[:3], 1):
+                    clean_snippet = re.sub(r'<[^>]+>', '', snippet).strip()
+                    clean_snippet = re.sub(r'\s+', ' ', clean_snippet)  # Normalize whitespace
+                    if clean_snippet:
+                        snippets.append(clean_snippet)
+                        print(f"  📄 Result {i}: {clean_snippet[:100]}...")
+                
+                if snippets:
+                    result = " ".join(snippets)
+                    print(f"  ✅ Found {len(snippets)} results")
+                    return result
         
         # Fallback: Try Wikipedia search
         print("  ⚠️ DuckDuckGo returned no results, trying Wikipedia...")

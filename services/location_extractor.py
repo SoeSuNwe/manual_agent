@@ -29,100 +29,97 @@ Answer in format: name: [name], city: [city], country: [country]"""
     }
 
 def parse_text_response(text):
-    """Parse text to extract location info"""
+    """Parse text to extract location info - works for any location worldwide"""
     location = {"name": None, "city": None, "country": None}
     
     if not text:
         return location
     
-    text_lower = text.lower()
-    
-    # Extract from "key: value" format
+    # Extract from "key: value" format (LLM response format)
     patterns = {
-        "name": r"name:\s*([^,\n]+)",
-        "city": r"city:\s*([^,\n]+)",
-        "country": r"country:\s*([^,\n]+)"
+        "name": r"name:\s*([A-Za-z][A-Za-z\s]{1,30}?)(?:,|\n|$)",
+        "city": r"city:\s*([A-Za-z][A-Za-z\s]{1,25}?)(?:,|\n|$)",
+        "country": r"country:\s*([A-Za-z][A-Za-z\s]{1,20}?)(?:,|\n|$)"
     }
     
     for key, pattern in patterns.items():
-        match = re.search(pattern, text_lower)
+        match = re.search(pattern, text, re.IGNORECASE)
         if match:
             value = match.group(1).strip()
-            if value and value not in ["null", "none", "unknown", "[name]", "[city]", "[country]"]:
-                location[key] = value.title()
+            if value and value.lower() not in ["null", "none", "unknown", "[name]", "[city]", "[country]", "n/a", ""]:
+                # Skip if value looks like a sentence (contains common words)
+                if not re.search(r'\b(is|are|was|were|the|an|in|at|of|to|for)\b', value.lower()) or key == "name":
+                    location[key] = value.title()
     
-    # Keyword-based extraction (fallback)
-    countries = {
-        "thailand": "Thailand",
-        "japan": "Japan",
-        "vietnam": "Vietnam",
-        "cambodia": "Cambodia",
-        "indonesia": "Indonesia",
-        "malaysia": "Malaysia",
-        "singapore": "Singapore",
-        "china": "China",
-        "india": "India",
-        "nepal": "Nepal"
-    }
+    # Pattern-based extraction from natural text (fallback)
+    text_clean = text
     
-    cities = {
-        "chiang mai": "Chiang Mai",
-        "bangkok": "Bangkok",
-        "phuket": "Phuket",
-        "tokyo": "Tokyo",
-        "kyoto": "Kyoto",
-        "hanoi": "Hanoi",
-        "ho chi minh": "Ho Chi Minh",
-        "bali": "Bali",
-        "singapore": "Singapore",
-        "kuala lumpur": "Kuala Lumpur"
-    }
+    # Pattern: "in [City], [Country]" - strict: 1-2 words only
+    if not location.get("city") or not location.get("country"):
+        match = re.search(r"(?:in|at|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\.|,|$|\s)", text)
+        if match:
+            city_candidate = match.group(1).strip()
+            country_candidate = match.group(2).strip()
+            if len(city_candidate) <= 20 and len(country_candidate) <= 20:
+                if not location.get("city"):
+                    location["city"] = city_candidate.title()
+                if not location.get("country"):
+                    location["country"] = country_candidate.title()
     
-    landmarks = {
-        "doi kham": "Doi Kham",
-        "doi suthep": "Doi Suthep",
-        "wat phra": "Wat Phra That",
-        "grand palace": "Grand Palace",
-        "angkor wat": "Angkor Wat"
-    }
+    # Pattern: "[City], [Country]" - strict format, short words only
+    if not location.get("city") or not location.get("country"):
+        match = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", text)
+        if match:
+            city_candidate = match.group(1).strip()
+            country_candidate = match.group(2).strip()
+            # Only use if they are short (real city/country names)
+            if len(city_candidate) <= 20 and len(country_candidate) <= 20:
+                if not location.get("city"):
+                    location["city"] = city_candidate.title()
+                if not location.get("country"):
+                    location["country"] = country_candidate.title()
     
-    # Landmark to location mapping (infer city/country from landmark)
-    landmark_locations = {
-        "doi kham": {"city": "Chiang Mai", "country": "Thailand"},
-        "doi suthep": {"city": "Chiang Mai", "country": "Thailand"},
-        "wat phra that doi": {"city": "Chiang Mai", "country": "Thailand"},
-        "grand palace": {"city": "Bangkok", "country": "Thailand"},
-        "angkor wat": {"city": "Siem Reap", "country": "Cambodia"}
-    }
-    
-    # Match landmarks first (to enable inference)
-    if not location.get("name"):
-        for key, value in landmarks.items():
-            if key in text_lower:
-                location["name"] = value
-                break
-    
-    # Infer city/country from landmark if not already set
-    for key, loc_info in landmark_locations.items():
-        if key in text_lower:
-            if not location.get("city"):
-                location["city"] = loc_info["city"]
-            if not location.get("country"):
-                location["country"] = loc_info["country"]
-            break
-    
-    # Match countries
-    if not location.get("country"):
-        for key, value in countries.items():
-            if key in text_lower:
-                location["country"] = value
-                break
-    
-    # Match cities
+    # Pattern: Address format "00184 Roma" or similar postal codes
     if not location.get("city"):
-        for key, value in cities.items():
-            if key in text_lower:
-                location["city"] = value
-                break
+        match = re.search(r"\d{4,5}\s+([A-Z][a-zA-Z]+)", text)
+        if match:
+            location["city"] = match.group(1).strip().title()
+    
+    # Pattern: "Location: [Place]" or "Address: [Place]"
+    if not location.get("name"):
+        match = re.search(r"(?:location|address|place|landmark):\s*([^,\n]+)", text, re.IGNORECASE)
+        if match:
+            location["name"] = match.group(1).strip().title()
+    
+    # Extract landmark name from common patterns - prioritize local names
+    if not location.get("name"):
+        # Pattern: Look for proper nouns at start (often the main subject)
+        match = re.search(r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:is|was)", text)
+        if match:
+            location["name"] = match.group(1).strip().title()
+    
+    # Pattern: "The [Name]" anywhere in text (common for landmarks)
+    if not location.get("name"):
+        match = re.search(r"The\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*[\(\[,]", text)
+        if match:
+            location["name"] = "The " + match.group(1).strip().title()
+    
+    # Pattern: "[Name]," at start - often the subject of a description  
+    if not location.get("name"):
+        match = re.search(r"^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*,", text)
+        if match:
+            location["name"] = match.group(1).strip().title()
+    
+    # Pattern: "called [Name]" or "known as [Name]" - but prefer original over nickname
+    if not location.get("name"):
+        match = re.search(r"(?:called|known as|named)\s+(?:the\s+)?([A-Z][a-zA-Z\s]+?)(?:\s+is|\s+in|\s+at|,|\.|$)", text, re.IGNORECASE)
+        if match:
+            nickname = match.group(1).strip().title()
+            # If there's an original name at the start, use that instead of nickname
+            original_match = re.search(r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+", text)
+            if original_match:
+                location["name"] = original_match.group(1).strip().title()
+            else:
+                location["name"] = nickname
     
     return location
