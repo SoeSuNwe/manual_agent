@@ -1,16 +1,19 @@
 # ManualAgent 🌍
 
-An AI-powered location extraction and geocoding pipeline that takes natural language descriptions and returns structured location data with coordinates.
+An AI-powered location extraction and geocoding pipeline that takes natural language descriptions and returns structured location data with coordinates. Now includes an **Autonomous Agent** mode that uses ReAct reasoning to intelligently decide which tools to use.
 
 ## Features
 
-- 🤖 **LLM-powered extraction** - Uses Azure OpenAI GPT-4 to extract location entities from text
+- 🤖 **LLM-powered extraction** - Uses Hugging Face's FLAN-T5 model to extract location entities from text
+- 🧠 **Autonomous Agent** - ReAct-based agent that reasons about which tools to use and when
 - 🔍 **Web search fallback** - Automatically searches DuckDuckGo/Wikipedia when location info is incomplete
 - 🗺️ **Real geocoding** - Fetches actual coordinates from OpenStreetMap Nominatim API
 - ✅ **Smart validation** - Detects missing fields and triggers additional searches
+- 🔄 **Multiple fallback strategies** - Tries different geocoding approaches for maximum success
 
 ## Architecture
 
+### Manual Pipeline (main.py)
 ```
 ┌─────────────────┐     ┌────────────────────┐     ┌─────────────────┐
 │  User Input     │────▶│ Location Extractor │────▶│    Validator    │
@@ -26,6 +29,27 @@ An AI-powered location extraction and geocoding pipeline that takes natural lang
                         │    Geo Service     │◀────│  Final Location │
                         │   (Nominatim API)  │     │     Output      │
                         └────────────────────┘     └─────────────────┘
+```
+
+### Autonomous Agent (agent_main.py)
+```
+┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+│  User Query     │────▶│   ReAct Agent       │────▶│  Final Answer   │
+│                 │     │  🧠 THINK           │     │                 │
+└─────────────────┘     │  🔧 ACT (use tools) │     └─────────────────┘
+                        │  👀 OBSERVE         │              ▲
+                        │  🔄 REPEAT          │              │
+                        └──────────┬──────────┘              │
+                                   │                         │
+                        ┌──────────▼──────────┐              │
+                        │    Tool Dispatcher   │              │
+                        │ ┌─────────────────┐ │              │
+                        │ │ extract_location│ │──────────────┘
+                        │ │ search_web      │ │
+                        │ │ get_coordinates │ │
+                        │ │ validate_data   │ │
+                        │ └─────────────────┘ │
+                        └─────────────────────┘
 ```
 
 ## Installation
@@ -57,39 +81,96 @@ An AI-powered location extraction and geocoding pipeline that takes natural lang
 
 ## Usage
 
-Run the application:
+### Manual Pipeline (Step-by-step)
+Run the traditional pipeline:
 ```bash
 python main.py
 ```
 
+### Autonomous Agent (AI decides the workflow)
+Run the autonomous agent:
+```bash
+python agent_main.py
+```
+
 Enter a location description when prompted:
 ```
-Enter location description: Ancient temple on top of a golden mountain near the airport
+Enter location description: Ancient temple on top of a golden mountain
 
-🚀 Pipeline started...
-📍 Extracting location...
-🔍 Searching for more details...
-🌍 Getting coordinates...
-✅ Pipeline complete!
+🤖 Autonomous Agent Started
+==================================================
 
-{'name': 'Doi Suthep', 'city': 'Chiang Mai', 'country': 'Thailand', 'latlong': '18.8166077, 98.8923600'}
+📍 Step 1/10
+------------------------------
+🧠 LLM Response:
+THOUGHT: I need to extract location information from this description. It's quite vague, so I should start by trying to extract what I can and then search for more details if needed.
+
+ACTION: extract_location
+PARAMETERS: {"text": "Ancient temple on top of a golden mountain"}
+
+💭 Thought: I need to extract location information from this description. It's quite vague, so I should start by trying to extract what I can and then search for more details if needed.
+
+🔧 Action: extract_location
+
+📍 Step 2/10
+------------------------------
+🧠 LLM Response:
+THOUGHT: The extraction didn't find specific location details. I need to search for more information about "ancient temple on top of a golden mountain" to identify the actual location.
+
+ACTION: search_web
+PARAMETERS: {"query": "ancient temple golden mountain"}
+
+💭 Thought: The extraction didn't find specific location details. I need to search for more information about "ancient temple on top of a golden mountain" to identify the actual location.
+
+🔧 Action: search_web
+
+📍 Step 3/10
+------------------------------
+
+✅ Final answer reached!
+
+==================================================
+🏁 Agent Completed
+
+{'name': 'Wat Phra That Doi Suthep', 'city': 'Chiang Mai', 'country': 'Thailand', 'latlong': '18.8166077, 98.8923600'}
 ```
 
 ### Examples
 
-| Input | Output |
-|-------|--------|
-| `Doi Kham temple in Chiang Mai, Thailand` | Direct extraction, no search needed |
-| `Ancient temple on top of a golden mountain` | Web search triggered, location inferred |
-| `Grand Palace Bangkok` | Direct extraction with geocoding |
+| Input | Manual Pipeline | Autonomous Agent |
+|-------|-----------------|------------------|
+| `Doi Kham temple in Chiang Mai, Thailand` | Direct extraction, no search needed | Agent extracts directly |
+| `Ancient temple on top of a golden mountain` | Web search triggered, location inferred | Agent reasons through search strategy |
+| `Grand Palace Bangkok` | Direct extraction with geocoding | Agent validates and geocodes |
+| `Famous tower near the Seine river` | Web search → Eiffel Tower extraction | Agent deduces it's the Eiffel Tower |
+
+## ReAct Agent Features
+
+The autonomous agent uses the **ReAct** (Reasoning + Acting) pattern:
+
+1. **🧠 THINK** - Analyzes the current situation and plans next action
+2. **🔧 ACT** - Executes a tool (extract_location, search_web, get_coordinates)
+3. **👀 OBSERVE** - Reviews the tool result and updates knowledge
+4. **🔄 REPEAT** - Continues until complete location data is found
+
+**Benefits:**
+- **Smart tool selection** - Only uses necessary tools
+- **Adaptive reasoning** - Adjusts strategy based on results
+- **Error recovery** - Can retry with different approaches
+- **Transparent process** - Shows its reasoning at each step
 
 ## Project Structure
 
 ```
 ManualAgent/
-├── main.py                    # Entry point
+├── main.py                    # Manual pipeline entry point
+├── agent_main.py             # Autonomous agent entry point
 ├── requirements.txt           # Dependencies
 ├── README.md                  # This file
+├── agent/
+│   ├── core.py               # ReAct agent implementation
+│   ├── prompts.py            # System prompts for agent
+│   └── dispatcher.py         # Tool dispatcher and action parser
 ├── llm/
 │   └── hf_model.py           # Azure OpenAI LLM client
 ├── services/

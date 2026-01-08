@@ -1,26 +1,28 @@
-from services.location_extractor import extract_location
-from services.web_search import search_location
-from services.geo_service import get_latlong
-from utils.validator import is_missing_fields
+"""
+Autonomous Location Agent - Uses ReAct pattern to extract location information.
+The LLM decides which tools to call and when.
+"""
 
-description = input("Enter location description: ")
+from agent.core import AutonomousAgent
 
-print("\n🚀 Pipeline started...")
-print("📍 Extracting location...")
-location = extract_location(description)
+def main():
+    print("=" * 60)
+    print("🤖 AUTONOMOUS LOCATION AGENT")
+    print("=" * 60)
+    print("This agent autonomously decides how to find location info.")
+    print("It will think, choose tools, and iterate until complete.\n")
+    
+    description = input("Enter location description: ")
+    
+    # Create and run the autonomous agent
+    agent = AutonomousAgent(max_iterations=10, verbose=True)
+    result = agent.run(description)
+    
+    print("\n" + "=" * 60)
+    print("📍 FINAL RESULT")
+    print("=" * 60)
+    print(result)
 
-if is_missing_fields(location):
-    print("🔍 Searching for more details...")
-    search_results = search_location(description)
-    location = extract_location(search_results)
 
-print("🌍 Getting coordinates...")
-latlong = get_latlong(
-    location["name"],
-    location["city"],
-    location["country"]
-)
-
-location["latlong"] = latlong
-print("✅ Pipeline complete!\n")
-print(location)
+if __name__ == "__main__":
+    main()
