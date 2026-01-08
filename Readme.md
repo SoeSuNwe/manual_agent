@@ -4,7 +4,7 @@ An AI-powered location extraction and geocoding pipeline that takes natural lang
 
 ## Features
 
-- 🤖 **LLM-powered extraction** - Uses Hugging Face's FLAN-T5 model to extract location entities from text
+- 🤖 **LLM-powered extraction** - Uses Azure OpenAI GPT-4 to extract location entities from text
 - 🔍 **Web search fallback** - Automatically searches DuckDuckGo/Wikipedia when location info is incomplete
 - 🗺️ **Real geocoding** - Fetches actual coordinates from OpenStreetMap Nominatim API
 - ✅ **Smart validation** - Detects missing fields and triggers additional searches
@@ -91,7 +91,7 @@ ManualAgent/
 ├── requirements.txt           # Dependencies
 ├── README.md                  # This file
 ├── llm/
-│   └── hf_model.py           # Hugging Face LLM pipeline
+│   └── hf_model.py           # Azure OpenAI LLM client
 ├── services/
 │   ├── location_extractor.py # Location entity extraction
 │   ├── web_search.py         # DuckDuckGo/Wikipedia search
@@ -102,24 +102,36 @@ ManualAgent/
 
 ## Dependencies
 
-- `torch` - PyTorch for running the LLM
-- `transformers` - Hugging Face Transformers library
+- `openai` - Azure OpenAI client library
+- `python-dotenv` - Load environment variables from .env file
 - `requests` - HTTP client for API calls
 
 ## APIs Used
 
 | Service | Purpose | Rate Limits |
 |---------|---------|-------------|
-| Hugging Face | FLAN-T5 model for NLP | Local (no limits) |
+| Azure OpenAI | GPT-4 model for NLP | Based on Azure tier |
 | DuckDuckGo | Web search fallback | Fair use |
 | Wikipedia | Secondary search fallback | 200 req/sec |
 | OpenStreetMap Nominatim | Geocoding | 1 req/sec |
 
 ## Configuration
 
-The model downloads automatically on first run (~1GB). To suppress warnings, the following environment variables are set:
-- `HF_HUB_DISABLE_SYMLINKS_WARNING=1`
-- `TRANSFORMERS_VERBOSITY=error`
+Create a `.env` file in the project root with your Azure OpenAI credentials:
+
+```env
+AZURE_OPENAI_API_KEY=your_api_key_here
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_OPENAI_API_KEY` | Your Azure OpenAI API key |
+| `AZURE_OPENAI_ENDPOINT` | Your Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | Your model deployment name (e.g., gpt-4) |
 
 ## License
 
