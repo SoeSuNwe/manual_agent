@@ -1,0 +1,39 @@
+Manual location extraction using HuggingFace LLM.
+Pipeline-based (non-agentic) design.
+Manual Agent (Non-agentic pipeline) – logic controlled by you
+Goal:
+From a natural language description, extract structured location data:
+{
+  "name": "Doi Kham",
+  "city": "Chiang Mai",
+  "country": "Thailand",
+  "latlong": "123,456"
+}
+Sometimes:
+
+City or country is missing
+
+We must search the web
+
+Then get latitude & longitude
+
+....
+Architecture Diagram
+
+Input Text
+   ↓
+LLM (Extract Info)
+   ↓
+Check Missing Fields
+   ↓
+Web Search (if needed)
+   ↓
+LLM (Best Match)
+   ↓
+Geo DB
+   ↓
+Final JSON
+
+
+......................
+python -c "import torch; print(torch.__version__)"
